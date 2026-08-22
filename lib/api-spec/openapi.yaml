@@ -1,0 +1,659 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Generator Management System API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: generators
+    description: Generator records
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateMe
+      tags: [auth]
+      summary: Update current user profile settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customPanels:
+                  type: string
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/demo-users:
+    get:
+      operationId: listDemoUsers
+      tags: [auth]
+      summary: List all demo users for the current admin
+      responses:
+        "200":
+          description: List of demo users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DemoUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createDemoUser
+      tags: [auth]
+      summary: Create a new demo user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDemoUserInput"
+      responses:
+        "201":
+          description: Demo user created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoUser"
+        "400":
+          description: Bad request (limit reached or invalid input)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/demo-users/{id}:
+    patch:
+      operationId: updateDemoUser
+      tags: [auth]
+      summary: Update a demo user's settings or toggle status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDemoUserInput"
+      responses:
+        "200":
+          description: Demo user updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoUser"
+        "404":
+          description: Demo user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteDemoUser
+      tags: [auth]
+      summary: Delete a demo user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Demo user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generators:
+    get:
+      operationId: listGenerators
+      tags: [generators]
+      summary: List all generator records with optional filters
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: generatorId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of generator records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GeneratorRecord"
+
+    post:
+      operationId: createGenerator
+      tags: [generators]
+      summary: Create a new generator record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratorInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorRecord"
+
+  /generators/stats:
+    get:
+      operationId: getGeneratorStats
+      tags: [generators]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorStats"
+
+  /generators/{id}:
+    get:
+      operationId: getGenerator
+      tags: [generators]
+      summary: Get a generator record by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Generator record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorRecord"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateGenerator
+      tags: [generators]
+      summary: Update a generator record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratorUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorRecord"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteGenerator
+      tags: [generators]
+      summary: Delete a generator record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        sheetLink:
+          type: string
+        customPanels:
+          type: ["string", "null"]
+        isDemoUser:
+          type: boolean
+        permissions:
+          type: string
+      required:
+        - id
+        - username
+        - email
+        - sheetLink
+
+    DemoUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        permissions:
+          type: string
+        isActive:
+          type: boolean
+        expiresAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - permissions
+        - isActive
+        - createdAt
+
+    CreateDemoUserInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        permissions:
+          type: string
+        isActive:
+          type: boolean
+        duration:
+          type: string
+      required:
+        - username
+        - password
+        - permissions
+        - isActive
+        - duration
+
+    UpdateDemoUserInput:
+      type: object
+      properties:
+        password:
+          type: string
+        permissions:
+          type: string
+        isActive:
+          type: boolean
+        duration:
+          type: string
+
+    UpdateMeInput:
+      type: object
+      properties:
+        customPanels:
+          type: string
+
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    RegisterInput:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        sheetLink:
+          type: string
+      required:
+        - username
+        - email
+        - password
+        - sheetLink
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required:
+        - user
+        - message
+
+    GeneratorRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        tDate:
+          type: string
+        generatorId:
+          type: string
+        status:
+          type: string
+        rating:
+          type: ["string", "null"]
+        hours:
+          type: ["number", "null"]
+        remarks:
+          type: ["string", "null"]
+        deliveryStatus:
+          type: ["string", "null"]
+        deliveryTo:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - tDate
+        - generatorId
+        - status
+        - createdAt
+        - updatedAt
+
+    GeneratorInput:
+      type: object
+      properties:
+        tDate:
+          type: string
+        generatorId:
+          type: string
+        status:
+          type: string
+        rating:
+          type: string
+        hours:
+          type: number
+        remarks:
+          type: string
+      required:
+        - tDate
+        - generatorId
+        - status
+
+    GeneratorUpdate:
+      type: object
+      properties:
+        tDate:
+          type: string
+        generatorId:
+          type: string
+        status:
+          type: string
+        rating:
+          type: string
+        hours:
+          type: number
+        remarks:
+          type: string
+        deliveryStatus:
+          type: string
+        deliveryTo:
+          type: ["string", "null"]
+
+    GeneratorStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+            required:
+              - status
+              - count
+        avgHours:
+          type: ["number", "null"]
+        recentCount:
+          type: integer
+        currentDelivery:
+          type: integer
+        previousDelivery:
+          type: integer
+      required:
+        - total
+        - byStatus
+        - recentCount
+        - currentDelivery
+        - previousDelivery

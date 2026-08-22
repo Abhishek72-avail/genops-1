@@ -1,0 +1,69 @@
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: generator_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gmsuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gmspassword}
+      POSTGRES_DB: ${POSTGRES_DB:-generatordb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gmsuser} -d ${POSTGRES_DB:-generatordb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── DB Migrations (runs once, then exits) ───────────────────────────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    container_name: generator_migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gmsuser}:${POSTGRES_PASSWORD:-gmspassword}@db:5432/${POSTGRES_DB:-generatordb}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Backend API Server ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: generator_backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gmsuser}:${POSTGRES_PASSWORD:-gmspassword}@db:5432/${POSTGRES_DB:-generatordb}
+      SESSION_SECRET: ${SESSION_SECRET:-super-secret-change-in-production}
+      NODE_ENV: production
+      COOKIE_SECURE: "false"
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── Frontend (Nginx + React SPA) ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: generator_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local

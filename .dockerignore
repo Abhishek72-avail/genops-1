@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Node modules — Docker installs its own
+node_modules
+**/node_modules
+
+# Build outputs
+**/dist
+**/.turbo
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+
+# Replit specific
+.replit
+.replitignore
+.replit-artifact
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local env overrides (not needed inside container)
+.env.local
+.env.*.local

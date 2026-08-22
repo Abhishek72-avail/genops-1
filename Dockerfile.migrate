@@ -1,0 +1,22 @@
+# Migration runner — installs only the db package and runs drizzle-kit push
+FROM node:24-alpine
+
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+WORKDIR /app
+
+# Copy workspace manifests
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY tsconfig.base.json tsconfig.json ./
+
+# Only need the db lib
+COPY lib/db/package.json ./lib/db/package.json
+
+# Install only what's needed for the db package
+# --config.minimumReleaseAge=0 bypasses the 1440-min publish-age check in pnpm-workspace.yaml
+RUN pnpm install --frozen-lockfile --filter @workspace/db... --config.minimumReleaseAge=0
+
+# Copy db source
+COPY lib/db/ ./lib/db/
+
+CMD ["pnpm", "--filter", "@workspace/db", "run", "push-force"]

@@ -1,0 +1,65 @@
+# ─── Stage 1: deps + build ───────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+WORKDIR /app
+
+# Copy workspace manifests first (for layer caching)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY tsconfig.base.json tsconfig.json ./
+
+# Copy all package.json files needed by the monorepo
+COPY lib/db/package.json ./lib/db/package.json
+COPY lib/api-spec/package.json ./lib/api-spec/package.json
+COPY lib/api-zod/package.json ./lib/api-zod/package.json
+COPY lib/api-client-react/package.json ./lib/api-client-react/package.json
+COPY artifacts/Backend/package.json ./artifacts/Backend/package.json
+
+# Install all workspace deps
+# --config.minimumReleaseAge=0 bypasses the 1440-min publish-age check in pnpm-workspace.yaml
+RUN pnpm install --frozen-lockfile --config.minimumReleaseAge=0
+
+# Copy source for packages the api-server depends on
+COPY lib/ ./lib/
+COPY artifacts/Backend/ ./artifacts/Backend/
+
+# Build the api-server bundle
+RUN pnpm --filter @workspace/api-server run build
+
+# ─── Stage 2: lean runtime ───────────────────────────────────────────────────
+FROM node:24-alpine AS runtime
+
+# Install pnpm (needed to install production deps)
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+WORKDIR /app
+
+# Copy workspace manifests for production install
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /app/.npmrc ./.npmrc
+
+# Copy package.json files for all workspace packages
+COPY --from=builder /app/lib/db/package.json ./lib/db/package.json
+COPY --from=builder /app/lib/api-spec/package.json ./lib/api-spec/package.json
+COPY --from=builder /app/lib/api-zod/package.json ./lib/api-zod/package.json
+COPY --from=builder /app/lib/api-client-react/package.json ./lib/api-client-react/package.json
+COPY --from=builder /app/artifacts/Backend/package.json ./artifacts/Backend/package.json
+
+# Install only production dependencies (includes googleapis and other externals)
+RUN pnpm install --frozen-lockfile --prod --config.minimumReleaseAge=0
+
+# Copy the built dist into the correct workspace package location
+# so Node.js resolves externalized packages (googleapis etc.) from
+# artifacts/Backend/node_modules/ when walking up the directory tree
+COPY --from=builder /app/artifacts/Backend/dist ./artifacts/Backend/dist
+
+EXPOSE 5000
+
+ENV NODE_ENV=production
+ENV PORT=5000
+
+CMD ["node", "--enable-source-maps", "./artifacts/Backend/dist/index.mjs"]
